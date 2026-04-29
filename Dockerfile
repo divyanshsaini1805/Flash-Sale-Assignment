@@ -1,4 +1,5 @@
-FROM maven:3.9.6-eclipse-temurin-17 AS build
+# Build stage: Using focal for better multi-arch stability (Apple Silicon + Intel)
+FROM --platform=$BUILDPLATFORM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 
 # Copy pom.xml and source code
@@ -8,8 +9,8 @@ COPY src ./src
 # Build the application
 RUN mvn clean package -DskipTests
 
-# Run stage
-FROM eclipse-temurin:17-jre-alpine
+# Run stage: Using focal JRE for consistent performance on Mac Silicon
+FROM eclipse-temurin:17-jre-focal
 WORKDIR /app
 
 # Copy the built jar file from the build stage
