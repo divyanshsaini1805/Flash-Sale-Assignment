@@ -1,0 +1,73 @@
+services:
+  # ==================== DATABASE ====================
+  postgres:
+    image: postgres:16-alpine
+    container_name: flashsale-db
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: flashsale_db
+      POSTGRES_USER: flashsale
+      POSTGRES_PASSWORD: flashsale123
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flashsale -d flashsale_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # ==================== APP INSTANCES ====================
+  app-1:
+    build: .
+    container_name: flashsale-app-1
+    environment: &app-env
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flashsale_db
+      SPRING_DATASOURCE_USERNAME: flashsale
+      SPRING_DATASOURCE_PASSWORD: flashsale123
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "false"
+      FLASHSALE_JWT_SECRET: Zm1hc2hzYWxlLWVuZ2luZS1zdXBlci1zZWNyZXQta2V5LTIwMjYtZm9yLWp3dC1zaWduaW5n
+      FLASHSALE_JWT_EXPIRATION_MS: "900000"
+      FLASHSALE_TARGET_EXECUTION_TIME_MS: "200"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app-2:
+    build: .
+    container_name: flashsale-app-2
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  app-3:
+    build: .
+    container_name: flashsale-app-3
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ==================== LOAD BALANCER ====================
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: flashsale-lb
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app-1
+      - app-2
+      - app-3
+    restart: unless-stopped
+
+volumes:
+  pgdata:
